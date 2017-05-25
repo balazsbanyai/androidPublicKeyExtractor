@@ -1,0 +1,94 @@
+/**
+ *
+ * Extracts the public keys from keystores defined by the app's signing configurations
+ *
+ * This is useful when these public keys need to be inserted into other consumer applications for verification purposes.
+ *
+ * */
+
+import java.security.Key
+import java.security.KeyStore
+import java.security.PrivateKey
+import java.security.cert.Certificate
+
+android.signingConfigs.all { config ->
+
+    if (config.name == 'debug') {
+        return
+    }
+
+    tasks.create(name: "extractPublicKeyFrom${config.name.capitalize()}", type: ExtractPublicKeys) { task ->
+        description "extracts the public key from the ${config.name.capitalize()} signing configuration"
+        group ExtractAllPublicKeys.GROUP
+
+        keystoreFile = config.storeFile
+        storepass = config.storePassword
+        alias = config.keyAlias
+        password = config.keyPassword
+
+        Task all = tasks.maybeCreate("extractPublicKeys", ExtractAllPublicKeys)
+        all.dependsOn task
+    }
+}
+
+class ExtractAllPublicKeys extends DefaultTask {
+    public static final String GROUP = "Public key extractor"
+    ExtractAllPublicKeys() {
+        group GROUP
+        description "extracts the public keys from all signing configurations"
+    }
+}
+
+class ExtractPublicKeys extends DefaultTask {
+
+    @InputFile
+    File keystoreFile
+
+    String storepass
+
+    String alias
+
+    String password
+
+    @OutputDirectory
+    File outputDir = getProject().file("${project.buildDir}/publicKeys/")
+
+    def checkPreconditions() {
+        if (!keystoreFile.exists()) {
+            throw new GradleException("The input keystore is missing")
+        }
+
+        if (storepass == null || storepass.isEmpty()) {
+            throw new GradleException("Store password is missing")
+        }
+
+        if (alias == null || alias.isEmpty()) {
+            throw new GradleException("Alias is missing")
+        }
+
+        if (password == null || password.isEmpty()) {
+            throw new GradleException("Password is missing")
+        }
+    }
+
+    @TaskAction
+    public void dumpPublicKey() {
+        checkPreconditions()
+
+        FileInputStream is = new FileInputStream(keystoreFile);
+
+        KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+        keystore.load(is, storepass.toCharArray());
+
+        Key key = keystore.getKey(alias, password.toCharArray());
+        if (key instanceof PrivateKey) {
+            Certificate cert = keystore.getCertificate(alias);
+            byte[] encoded = cert.getEncoded()
+            def publicKeyBytes = Base64.getEncoder().encodeToString(encoded);
+
+            File f = new File(outputDir.path, "${keystoreFile.name}.publicKey")
+            f.createNewFile()
+            f << publicKeyBytes
+        }
+    }
+}
