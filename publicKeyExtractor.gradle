@@ -75,18 +75,19 @@ class ExtractPublicKeys extends DefaultTask {
     public void dumpPublicKey() {
         checkPreconditions()
 
-        FileInputStream is = new FileInputStream(keystoreFile);
+        FileInputStream is = new FileInputStream(keystoreFile)
 
-        KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
-        keystore.load(is, storepass.toCharArray());
+        KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType())
+        keystore.load(is, storepass.toCharArray())
 
-        Key key = keystore.getKey(alias, password.toCharArray());
+        Key key = keystore.getKey(alias, password.toCharArray())
         if (key instanceof PrivateKey) {
-            Certificate cert = keystore.getCertificate(alias);
+            Certificate cert = keystore.getCertificate(alias)
             byte[] encoded = cert.getEncoded()
-            def publicKeyBytes = Base64.getEncoder().encodeToString(encoded);
+            def publicKeyBytes = Base64.getEncoder().encodeToString(encoded)
 
-            File f = new File(outputDir.path, "${keystoreFile.name}.publicKey")
+            def name = keystoreFile.name.substring(0, keystoreFile.name.lastIndexOf('.'))
+            File f = new File(outputDir.path, "${name}_pub")
             f.createNewFile()
             f << publicKeyBytes
         }
